@@ -1,0 +1,100 @@
+name: Launch Antithesis test
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        type: string
+        required: true
+        default: "60"
+        description: Duration of the test run (in minutes)
+      emails:
+        type: string
+        required: true
+        description: Email recipients
+      description:
+        type: string
+        required: true
+        default: "Antithesis CI test run for 60 minutes"
+        description: Description of the test run, for example, testing version X with Y
+
+env:
+  REGISTRY: ${{ secrets.ANTITHESIS_REGISTRY_URL }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Login to Antithesis GAR
+        uses: docker/login-action@v3
+        with:
+          registry: us-central1-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.ANTITHESIS_GAR_JSON_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push postgres
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./postgres.Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            ENABLE_ASSERTIONS=1
+          tags: |
+            ${{ env.REGISTRY }}/postgres:latest
+            ${{ env.REGISTRY }}/postgres:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/postgres:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/postgres:buildcache,mode=max
+
+      - name: Build and push antigres
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./antigres.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/antigres:latest
+            ${{ env.REGISTRY }}/antigres:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/antigres:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/antigres:buildcache,mode=max
+
+      - name: Prepare config context
+        run: |
+          sed -i \
+            -e "s|image: postgres:latest|image: ${{ env.REGISTRY }}/postgres:latest|g" \
+            -e "s|image: antigres:latest|image: ${{ env.REGISTRY }}/antigres:latest|g" \
+            postgres/docker-compose.yaml
+
+      - name: Build and push config
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./config.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/postgres_config:latest
+            ${{ env.REGISTRY }}/postgres_config:${{ github.sha }}
+
+      - name: Run Antithesis basic_test
+        uses: antithesishq/antithesis-trigger-action@main
+        with:
+          notebook_name: basic_test
+          tenant: ${{ secrets.ANTITHESIS_TENANT }}
+          username: ${{ secrets.ANTITHESIS_USERNAME }}
+          password: ${{ secrets.ANTITHESIS_PASSWORD }}
+          github_token: ${{ secrets.GH_PAT }}
+          config_image: ${{ env.REGISTRY }}/postgres_config:${{ github.sha }}
+          images: ${{ env.REGISTRY }}/postgres:${{ github.sha }};${{ env.REGISTRY }}/antigres:${{ github.sha }}
+          email_recipients: ${{ inputs.emails }}
+          additional_parameters: |
+            antithesis.description=${{ inputs.description }}
+            antithesis.duration=${{ inputs.duration }}
