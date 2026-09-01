@@ -34,21 +34,8 @@ RUN wget -q -O /tmp/postgresql.tar.bz2 \
 
 WORKDIR /usr/src/postgresql
 
-RUN cat > /usr/local/bin/clang-antithesis <<'EOF'
-#!/bin/sh
-# If any argument is "-c" this is a compile step -> pass the coverage flag.
-# Otherwise this is a link step -> omit it.
-for arg in "$@"; do
-    if [ "$arg" = "-c" ]; then
-        exec /usr/bin/clang -fsanitize-coverage=trace-pc-guard "$@"
-    fi
-done
-exec /usr/bin/clang "$@"
-EOF
-RUN chmod +x /usr/local/bin/clang-antithesis
-
-RUN CC=/usr/local/bin/clang-antithesis \
-    CFLAGS="-O2 -g" \
+RUN CC=clang \
+    CFLAGS="-O2 -g -fsanitize-coverage=trace-pc-guard -fno-sanitize-link-runtime" \
     LDFLAGS="-Wl,--build-id -fuse-ld=lld -L/usr/lib -lvoidstar" \
     ./configure \
         --prefix=/usr/local/pgsql \
