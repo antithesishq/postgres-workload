@@ -38,7 +38,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push postgres
+      - name: Build and push instrumented postgres
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -48,30 +48,30 @@ jobs:
           build-args: |
             ENABLE_ASSERTIONS=1
           tags: |
-            ${{ env.REGISTRY }}/postgres:latest
-            ${{ env.REGISTRY }}/postgres:${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/postgres:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/postgres:buildcache,mode=max
+            ${{ env.REGISTRY }}/postgres-instrumented:latest
+            ${{ env.REGISTRY }}/postgres-instrumented:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/postgres-instrumented:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/postgres-instrumented:buildcache,mode=max
 
-      - name: Build and push antigres
+      - name: Build and push test client
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./antigres.Dockerfile
+          file: ./test_client.Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/antigres:latest
-            ${{ env.REGISTRY }}/antigres:${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/antigres:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/antigres:buildcache,mode=max
+            ${{ env.REGISTRY }}/antigres-test-client:latest
+            ${{ env.REGISTRY }}/antigres-test-client:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/antigres-test-client:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/antigres-test-client:buildcache,mode=max
 
       - name: Prepare config context
         run: |
           sed -i \
-            -e "s|image: postgres:latest|image: ${{ env.REGISTRY }}/postgres:latest|g" \
-            -e "s|image: antigres:latest|image: ${{ env.REGISTRY }}/antigres:latest|g" \
-            postgres/docker-compose.yaml
+            -e "s|image: postgres-instrumented:latest|image: ${{ env.REGISTRY }}/postgres-instrumented:latest|g" \
+            -e "s|image: antigres-test-client:latest|image: ${{ env.REGISTRY }}/antigres-test-client:latest|g" \
+            docker-compose.yaml
 
       - name: Build and push config
         uses: docker/build-push-action@v5
@@ -93,7 +93,7 @@ jobs:
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.GH_PAT }}
           config_image: ${{ env.REGISTRY }}/postgres_config:${{ github.sha }}
-          images: ${{ env.REGISTRY }}/postgres:${{ github.sha }};${{ env.REGISTRY }}/antigres:${{ github.sha }}
+          images: ${{ env.REGISTRY }}/postgres-instrumented:${{ github.sha }};${{ env.REGISTRY }}/antigres-test-client:${{ github.sha }}
           email_recipients: ${{ inputs.emails }}
           additional_parameters: |
             antithesis.description=${{ inputs.description }}
