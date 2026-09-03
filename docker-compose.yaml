@@ -1,0 +1,24 @@
+services:
+  postgres_under_test:
+    init: true
+    container_name: postgres_under_test
+    hostname: postgres_under_test
+    restart: always
+    image: postgres-instrumented:latest
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=postgres
+    ports:
+      - "5432:5432"
+
+  test_client:
+    init: true
+    container_name: test_client
+    hostname: test_client
+    restart: always
+    image: postgres-test-client:latest
+    depends_on:
+      - postgres_under_test
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres_under_test:5432/postgres
+      - DURABILITY_LEDGER_PATH=/var/lib/antigres/durability.sqlite3
