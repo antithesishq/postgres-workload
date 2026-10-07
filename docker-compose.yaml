@@ -5,6 +5,8 @@ services:
     hostname: postgres_under_test
     restart: always
     image: postgres-instrumented:latest
+    tmpfs:
+      - /var/run/postgresql:mode=1777
     environment:
       - POSTGRES_PASSWORD=password
       - POSTGRES_USER=postgres

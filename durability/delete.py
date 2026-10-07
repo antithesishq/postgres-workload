@@ -68,6 +68,7 @@ def run_once(db: Database) -> bool:
 
     if status == NOT_PRESENT:
         reachable(
-            "Durability: successful delete outcome recorded locally"
+            "Durability: successful delete outcome recorded locally",
+            {"cksum": digest},
         )
     return status != UNKNOWN
