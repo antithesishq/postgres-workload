@@ -3,16 +3,16 @@ from antithesis.random import get_random
 import psycopg
 import sqlite3
 
-from durability.helper import BATCH_SIZE, PRESENT, open_sqlite, text
+from durability.helper import BATCH_SIZE, PRESENT, checksum, open_sqlite, text
 from test_client.database import Database
 
 
 def validate_one(db: Database) -> bool:
     """
-    Pick a random present key and check that it exists in the database.
+    Pick a random present key and check its presence and payload integrity.
 
-    We delete the key from the database to prevent other drivers from deleting
-    it in the meantime.
+    We remove the key from the local ledger to prevent other drivers from
+    deleting it in the meantime.
     """
     local_db = open_sqlite()
     try:
@@ -49,14 +49,14 @@ def validate_one(db: Database) -> bool:
         local_db.close()
         return True
 
-    # now check that the key exists in the database
+    # Fetch the payload so we can check it against the original digest.
     database_error = None
     try:
         with db.connect() as connection:
-            exists = connection.execute(
-                'SELECT EXISTS (SELECT 1 FROM "values" WHERE cksum = %s)',
+            row = connection.execute(
+                'SELECT data FROM "values" WHERE cksum = %s',
                 (digest,),
-            ).fetchone()[0]
+            ).fetchone()
     except (psycopg.Error, OSError) as error:
         database_error = error
 
@@ -83,17 +83,25 @@ def validate_one(db: Database) -> bool:
         )
         return False
 
+    exists = row is not None
     always(
         exists,
         "Durability: any present value must be in the database",
         {"cksum": digest, "exists": exists},
     )
+    if exists:
+        actual_digest = checksum(row[0])
+        always(
+            actual_digest == digest,
+            "Durability: any present value must match its original checksum",
+            {"cksum": digest, "actual_cksum": actual_digest},
+        )
     return True
 
 
 def validate_all(db: Database) -> bool:
     """
-    Check that all keys we inserted are present in the database. Used as part of a finally_ driver.
+    Check presence and payload integrity for all present keys in a finally_ driver.
     """
     local_db = open_sqlite()
     try:
@@ -114,18 +122,26 @@ def validate_all(db: Database) -> bool:
 
     # Note: this test can only be run while no read/write requests are in flight to the database.
     found: set[str] = set()
+    corrupted: list[dict[str, str]] = []
+    corrupted_count = 0
     try:
         checksums = list(present)
         with db.connect() as connection:
             for start in range(0, len(checksums), BATCH_SIZE):
                 batch = checksums[start : start + BATCH_SIZE]
-                found.update(
-                    text(row[0])
-                    for row in connection.execute(
-                        'SELECT cksum FROM "values" WHERE cksum = ANY(%s)',
-                        (batch,),
-                    )
-                )
+                for digest, data in connection.execute(
+                    'SELECT cksum, data FROM "values" WHERE cksum = ANY(%s)',
+                    (batch,),
+                ):
+                    digest = text(digest)
+                    found.add(digest)
+                    actual_digest = checksum(data)
+                    if actual_digest != digest:
+                        corrupted_count += 1
+                        if len(corrupted) < 20:
+                            corrupted.append(
+                                {"cksum": digest, "actual_cksum": actual_digest}
+                            )
     except (psycopg.Error, OSError) as error:
         reachable(
             "Durability final: database validation can be unavailable",
@@ -138,5 +154,10 @@ def validate_all(db: Database) -> bool:
         not missing,
         "Durability final: any present value must be in the database",
         {"missing": missing[:20], "missing_count": len(missing)},
+    )
+    always(
+        corrupted_count == 0,
+        "Durability final: any present value must match its original checksum",
+        {"corrupted": corrupted, "corrupted_count": corrupted_count},
     )
     return True
