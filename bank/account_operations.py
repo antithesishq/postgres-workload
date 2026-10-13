@@ -23,7 +23,7 @@ def transfer(db: Database) -> bool:
                 return False
             sender_id, recipient_id = pair
             rows = connection.execute(
-                "SELECT id, balance FROM accounts WHERE id = ANY(%s) ORDER BY id FOR UPDATE",
+                "SELECT id, balance FROM accounts WHERE id = ANY(%s) ORDER BY id",
                 (list(pair),),
             ).fetchall()
             if len(rows) != 2:
@@ -70,7 +70,7 @@ def delete_account(db: Database) -> bool:
                 return False
             source_id, recipient_id = pair
             rows = connection.execute(
-                "SELECT id, balance FROM accounts WHERE id = ANY(%s) ORDER BY id FOR UPDATE",
+                "SELECT id, balance FROM accounts WHERE id = ANY(%s) ORDER BY id",
                 (list(pair),),
             ).fetchall()
             if len(rows) != 2:
@@ -96,7 +96,7 @@ def change_padding(db: Database, operation: str) -> bool:
                 return False
             account_id = ids[get_random() % len(ids)]
             row = connection.execute(
-                "SELECT padding FROM accounts WHERE id = %s FOR UPDATE", (account_id,)
+                "SELECT padding FROM accounts WHERE id = %s", (account_id,)
             ).fetchone()
             if row is None:
                 return False
