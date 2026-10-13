@@ -12,5 +12,5 @@ def run_once(db: Database) -> bool:
     except (psycopg.Error, OSError) as error:
         print(f"WAL switch was interrupted: {error}", flush=True)
         return False
-    reachable("WAL: switch request completed")
+    reachable("WAL: switch request completed", {})
     return True

@@ -20,9 +20,9 @@ def run_once(db: Database) -> bool:
         print(f"durability vacuum ({mode}) was interrupted: {error}", flush=True)
         return False
     if mode == "freeze":
-        reachable("Durability: vacuum freeze completed")
+        reachable("Durability: vacuum freeze completed", {})
     elif mode == "full":
-        reachable("Durability: vacuum full completed")
+        reachable("Durability: vacuum full completed", {})
     else:
-        reachable("Durability: vacuum completed")
+        reachable("Durability: vacuum completed", {})
     return True

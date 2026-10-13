@@ -11,7 +11,7 @@ COPY durability /opt/antigres/durability
 COPY test_client /opt/antigres/test_client
 COPY entrypoint /opt/antithesis/test/v1/postgres
 
-RUN mkdir -p /var/lib/antigres \
+RUN mkdir -p /var/lib/antigres /.antithesis-produced/catalog \
     && chmod +x /opt/antithesis/test/v1/postgres/*
 
 ENV PYTHONPATH=/opt/antigres

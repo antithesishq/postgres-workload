@@ -20,9 +20,9 @@ def run_once(db: Database) -> bool:
         print(f"bank vacuum ({mode}) was interrupted: {error}", flush=True)
         return False
     if mode == "freeze":
-        reachable("Bank: vacuum freeze completed")
+        reachable("Bank: vacuum freeze completed", {})
     elif mode == "full":
-        reachable("Bank: vacuum full completed")
+        reachable("Bank: vacuum full completed", {})
     else:
-        reachable("Bank: vacuum completed")
+        reachable("Bank: vacuum completed", {})
     return True

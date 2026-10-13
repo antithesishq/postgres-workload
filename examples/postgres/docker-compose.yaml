@@ -18,7 +18,7 @@ services:
     container_name: test_client
     hostname: test_client
     restart: always
-    image: postgres-test-client:latest
+    image: antigres-test-client:latest
     depends_on:
       - postgres_under_test
     environment:

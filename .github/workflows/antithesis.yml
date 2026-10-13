@@ -42,7 +42,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./postgres.Dockerfile
+          file: ./examples/postgres/postgres.Dockerfile
           platforms: linux/amd64
           push: true
           build-args: |
@@ -71,13 +71,13 @@ jobs:
           sed -i \
             -e "s|image: postgres-instrumented:latest|image: ${{ env.REGISTRY }}/postgres-instrumented:latest|g" \
             -e "s|image: antigres-test-client:latest|image: ${{ env.REGISTRY }}/antigres-test-client:latest|g" \
-            docker-compose.yaml
+            examples/postgres/docker-compose.yaml
 
       - name: Build and push config
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./config.Dockerfile
+          context: ./examples/postgres
+          file: ./examples/postgres/config.Dockerfile
           platforms: linux/amd64
           push: true
           tags: |

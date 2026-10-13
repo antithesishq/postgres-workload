@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 /scratch/
+
+/examples/cnpg/generated/
+examples/cnpg/README.md
