@@ -7,8 +7,8 @@ from bank.helper import (
     TRANSACTION_RETRIES,
     account_ids,
     begin_serializable,
-    choose_two,
     random_padding,
+    sample_pair,
     truncate_length,
 )
 from test_client.database import Database
@@ -16,12 +16,12 @@ from test_client.database import Database
 
 def transfer(db: Database) -> bool:
     with db.connect() as connection:
+        pair = sample_pair(connection)
+        if pair is None:
+            return False
+        sender_id, recipient_id = pair
         with connection.transaction():
             begin_serializable(connection)
-            pair = choose_two(account_ids(connection))
-            if pair is None:
-                return False
-            sender_id, recipient_id = pair
             rows = connection.execute(
                 "SELECT id, balance FROM accounts WHERE id = ANY(%s) ORDER BY id",
                 (list(pair),),
@@ -63,12 +63,12 @@ def add_account(db: Database) -> bool:
 
 def delete_account(db: Database) -> bool:
     with db.connect() as connection:
+        pair = sample_pair(connection)
+        if pair is None:
+            return False
+        source_id, recipient_id = pair
         with connection.transaction():
             begin_serializable(connection)
-            pair = choose_two(account_ids(connection))
-            if pair is None:
-                return False
-            source_id, recipient_id = pair
             rows = connection.execute(
                 "SELECT id, balance FROM accounts WHERE id = ANY(%s) ORDER BY id",
                 (list(pair),),
@@ -159,6 +159,11 @@ def run_once(db: Database) -> bool:
             return change_padding(db, operation.removeprefix("padding_"))
         except psycopg.Error as error:
             if error.sqlstate in RETRYABLE_SQLSTATES and attempt < TRANSACTION_RETRIES:
+                reachable(
+                    "Bank: operation retried after a serialization failure or deadlock",
+                    {"operation": operation, "attempt": attempt, "sqlstate": error.sqlstate},
+                )
+                print(f"bank {operation} retry {attempt}: {error.sqlstate}", flush=True)
                 continue
             print(f"bank {operation} was interrupted: {error}", flush=True)
             return False

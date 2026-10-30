@@ -26,6 +26,14 @@ def setup(db: Database) -> None:
             connection.execute(
                 "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS padding TEXT NULL"
             )
+            # A plain index, not a primary key: the validator deliberately
+            # checks id uniqueness itself. Without an index every lookup by id
+            # is a sequential scan, which under SERIALIZABLE takes a
+            # relation-level predicate lock and makes every concurrent write
+            # to the table a read/write dependency.
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS accounts_id_idx ON accounts (id)"
+            )
             connection.execute("LOCK TABLE accounts IN EXCLUSIVE MODE")
             count = connection.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
             if count:
